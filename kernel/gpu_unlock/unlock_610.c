@@ -1059,7 +1059,7 @@ static int unlock_transaction_gfw(struct unlock_transaction_work *work)
 			 * never leaves behind, so refuse it rather than guess.
 			 */
 			if (work->plm_entry == ~0u) {
-				if (ss0 == GU_SS0_UNLOCK && (ss1 & 0xfu) == GU_SS1_UNLOCK)
+				if (ss0 == GU_SS0_UNLOCK && ss1 == GU_SS1_UNLOCK)
 					return -EALREADY;
 				dev_err(&work->pdev->dev, "PLM open but selectors not unlocked (ss0=%#x ss1=%#x); power off first\n",
 					ss0, ss1);
