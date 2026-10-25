@@ -410,6 +410,25 @@ int main(void)
 	shutdown();
 	puts("resume: switch off and firmware failure leave cards locked PASS");
 
+	/* A warm reboot that kept power: the card is still unlocked from the last
+	 * boot. That is success, not a failure, and the card stays listed so it
+	 * is unlocked again after a suspend that does power it off. */
+	reset("all");
+	add("0000:01:00.0", RTX_3090, false);
+	add("0000:21:00.0", RTX_3090, false);
+	fake.fail_unlock[0] = -EALREADY;
+	boot();
+	assert(logged("0000:01:00.0: gpu_unlock: already unlocked (kept power since an earlier unlock)"));
+	assert(!logged("0000:01:00.0: gpu_unlock: unlock failed"));
+	assert(logged("0000:21:00.0: gpu_unlock: unlocked"));
+	assert(fake.registrations == 1);
+	devices[0].driver = &nvidia_driver;
+	devices[1].driver = &nvidia_driver;
+	notify(PM_POST_SUSPEND);
+	assert(fake.resumes[0] == 1 && fake.resumes[1] == 1);
+	shutdown();
+	puts("warm reboot: already-unlocked card counted and kept for resume PASS");
+
 	/* Nothing unlocked at boot: no notifier at all. */
 	reset("all");
 	add("0000:01:00.0", RTX_3090, false);

@@ -1052,9 +1052,19 @@ static int unlock_transaction_gfw(struct unlock_transaction_work *work)
 				return GU_RESULT(-ENODEV);
 			dev_info(&work->pdev->dev, "entry: plm=%#x ss0=%#x ss1=%#x wpr2_hi=%#x\n",
 				 work->plm_entry, ss0, ss1, wpr_hi);
-			/* An open PLM means the card was already unlocked or not cold. */
-			if (work->plm_entry == ~0u)
-				return GU_RESULT(-EALREADY);
+			/* An open PLM means the payload already ran this power cycle
+			 * (a warm reboot keeps it). With the selectors still at the
+			 * unlock values the card needs nothing: report it as already
+			 * unlocked. Open but not selected is a state this module
+			 * never leaves behind, so refuse it rather than guess.
+			 */
+			if (work->plm_entry == ~0u) {
+				if (ss0 == GU_SS0_UNLOCK && (ss1 & 0xfu) == GU_SS1_UNLOCK)
+					return -EALREADY;
+				dev_err(&work->pdev->dev, "PLM open but selectors not unlocked (ss0=%#x ss1=%#x); power off first\n",
+					ss0, ss1);
+				return GU_RESULT(-EBUSY);
+			}
 			/* WPR2 is down from power-on until FWSEC-FRTS runs. An enabled
 			 * WPR2 means a driver has already used the card this power
 			 * cycle; starting FWSEC and Booter again from here is untested.

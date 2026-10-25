@@ -434,16 +434,21 @@ int main(int argc, char **argv) {
         }
         assert(!fake.writes && !fake.allocs && !fake.starts && !fake.flrs);
     }
-    /* Cold entry: completed GFW, closed PLM and WPR2 down. A used card is refused. */
-    for(int mode=0;mode<3;mode++) {
+    /* Cold entry: completed GFW, closed PLM and WPR2 down. A used card is refused.
+     * An open PLM (warm reboot) is already unlocked only with both selectors set;
+     * open with cold selectors (mode 3) is refused. */
+    for(int mode=0;mode<4;mode++) {
         setup(&w);
         regs[GU_GFW_PLM_OFFSET/4]=1;regs[GU_GFW_BOOT_OFFSET/4]=0xff;regs[GU_GFW_CPUCTL_OFFSET/4]=0x10;
-        regs[GU_FEAT_PLM_OFFSET/4]=mode==1?~0u:0x8f;
+        regs[GU_FEAT_PLM_OFFSET/4]=(mode==1 || mode==3)?~0u:0x8f;
+        regs[GU_FEAT_SS0_OFFSET/4]=mode==3?0x40171022:0x88888888;
+        regs[GU_FEAT_SS1_OFFSET/4]=mode==3?0x2:0x8;
         if(mode==2)regs[0x1fa828/4]=0x5ffef0;
         int ret=unlock_transaction_gfw(&w);
         assert(ret==(mode==0?0:mode==1?-EALREADY:-EBUSY));
         assert(!fake.writes && !fake.gsp_starts);
         if(mode==2)assert(strstr(fake.log,"card already initialised since power on"));
+        if(mode==3)assert(strstr(fake.log,"PLM open but selectors not unlocked"));
     }
     setup(&w); dev.dev_flags=PCI_DEV_FLAGS_NO_FLR_RESET;
     assert(unlock_transaction_claim(&w)==-EOPNOTSUPP && !fake.flrs && !fake.allocs);

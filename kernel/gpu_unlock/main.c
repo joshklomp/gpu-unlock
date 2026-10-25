@@ -73,10 +73,16 @@ static void unlock_one(void *data, async_cookie_t cookie)
 	pci_dev_lock(pdev);
 	ret = pdev->driver ? -EBUSY : gpu_unlock_610_unlock(pdev, &shared, false);
 	pci_dev_unlock(pdev);
-	if (ret)
+	/* A warm reboot can keep the card powered, and with it the selectors an
+	 * earlier boot wrote: it is unlocked, and must stay listed for resume. */
+	if (ret == -EALREADY) {
+		pci_info(pdev, "gpu_unlock: already unlocked (kept power since an earlier unlock)\n");
+		ret = 0;
+	} else if (ret) {
 		pci_err(pdev, "gpu_unlock: unlock failed (%d)\n", ret);
-	else
+	} else {
 		pci_info(pdev, "gpu_unlock: unlocked\n");
+	}
 	card->unlocked = !ret;
 }
 
